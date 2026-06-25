@@ -18,7 +18,7 @@ app.use('/api/orders', orderRouter);
 const allowOrigins = [
     'http://localhost:5173',
     'http://localhost:5000',
-    'https://dryfruitmandifrontend.vercel.app/',
+    'https://dryfruitmandifrontend.vercel.app',
 ];
 
 app.use(cors({
@@ -27,7 +27,8 @@ app.use(cors({
             callback(null, true);
         }
         else {
-            callback(new Error('Not allowed by CORS'));
+            console.error(`CORS Blocked for Origin: ${origin}`);
+            callback(new Error('Not allowed by CORS policy'));
         }
     }
 }));

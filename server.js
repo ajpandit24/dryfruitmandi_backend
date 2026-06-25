@@ -18,7 +18,7 @@ app.use('/api/orders', orderRouter);
 const allowOrigins = [
     'http://localhost:5173',
     'http://localhost:5000',
-    'https://dryfruits-mandi.netlify.app',
+    'https://dryfruitmandifrontend.vercel.app/',
 ];
 
 app.use(cors({

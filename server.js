@@ -1,19 +1,15 @@
-
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 require('dotenv').config();
 const { Readable } = require('stream');
 const csv = require('csv-parser');
-const axios = require('axios'); // Added missing axios import
+const axios = require('axios');
 const orderRouter = require('./src/routes/orderRoutes');
 
 const app = express();
 
 app.use(helmet());
-app.use(cors());
-app.use(express.json());
-app.use('/api/orders', orderRouter);
 
 const allowOrigins = [
     'http://localhost:5173',
@@ -34,66 +30,145 @@ app.use(cors({
 }));
 
 app.use(express.json());
+app.use('/api/orders', orderRouter);
 
-// Main shared Google Sheets Published CSV link
-const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTJV34w0sNNlTN9Rf-UMPGMpF4LAQi0UiGu_3SLP6rUux_KbQ4mzyzoLX2yZ2fjZkxdhekA0giuCCet/pub?output=csv';
+// --- GOOGLE SHEETS LIVE PUBLISHED CSV LINKS ---
+// Sheet 1: Products
+const PRODUCTS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTJV34w0sNNlTN9Rf-UMPGMpF4LAQi0UiGu_3SLP6rUux_KbQ4mzyzoLX2yZ2fjZkxdhekA0giuCCet/pub?gid=0&single=true&output=csv';
+// Sheet 2: Categories (Paste your published CSV link for Sheet 2 here)
+const CATEGORIES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTJV34w0sNNlTN9Rf-UMPGMpF4LAQi0UiGu_3SLP6rUux_KbQ4mzyzoLX2yZ2fjZkxdhekA0giuCCet/pub?gid=577856047&single=true&output=csv';
 
-// 1. Added 'async' here so 'await' works inside the controller context
+// Helper function to turn a downloaded CSV string response into an array of row objects
+const parseCsvString = (csvData) => {
+    return new Promise((resolve, reject) => {
+        const results = [];
+        Readable.from([csvData])
+            .pipe(csv())
+            .on('data', (data) => results.push(data))
+            .on('end', () => resolve(results))
+            .on('error', (err) => reject(err));
+    });
+};
+
 app.get('/api/products', async (req, res) => {
     try {
-        // Download the live CSV data straight from Google Sheets
-        const response = await axios.get(GOOGLE_SHEET_CSV_URL);
-        const results = [];
+        console.log("--- Fetching data from Google Sheets ---");
+        const [productsResponse, categoriesResponse] = await Promise.all([
+            axios.get(PRODUCTS_CSV_URL),
+            axios.get(CATEGORIES_CSV_URL)
+        ]);
 
-        // Stream and parse the CSV string into javascript objects
-        const stream = Readable.from([response.data]);
+        const rawProducts = await parseCsvString(productsResponse.data);
+        const rawCategories = await parseCsvString(categoriesResponse.data);
 
-        stream.pipe(csv())
-            .on('data', (data) => results.push(data))
-            .on('end', () => {
-                const productsMap = {};
-                const categories = new Set(); 
+        // DEBUG LOGS: Check if rows are actually downloading
+        console.log(`Downloaded ${rawProducts.length} product rows.`);
+        console.log(`Downloaded ${rawCategories.length} category rows.`);
+        
+        if (rawCategories.length > 0) {
+            console.log("Sample Category Row Keys:", Object.keys(rawCategories[0]));
+            console.log("Sample Category Row Data:", rawCategories[0]);
+        }
+        if (rawProducts.length > 0) {
+            console.log("Sample Product Row Keys:", Object.keys(rawProducts[0]));
+        }
 
-                // 2. Changed 'rows.forEach' to 'results.forEach' to parse the loaded array
-                results.forEach(row => {
-                    if (!row.id || !row.product_name) return; // Guard against empty trailing cells
+        const nestedCategoriesMap = {};
 
-                    const categoryName = row.category ? row.category.trim() : "Uncategorized";
-                    categories.add(categoryName);
+        // Pass 1: Build categories map
+        rawCategories.forEach((row, index) => {
+            // Trim keys in case there are accidental trailing spaces in the headers
+            const categoryKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'category');
+            const imageKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'category_image');
 
-                    const id = row.id.trim();
+            if (!categoryKey || !row[categoryKey]) {
+                console.log(`Skipping category row ${index + 2} due to missing category header/value`);
+                return;
+            }
 
-                    if (!productsMap[id]) {
-                        productsMap[id] = {
-                            id: id,
-                            name: row.product_name.trim(),
-                            category: categoryName,
-                            apmc: row.apmc ? row.apmc.trim() : "0",
-                            gst: row.gst ? row.gst.trim() : "0",
-                            variants: []
-                        };
-                    }
+            const categoryName = row[categoryKey].trim();
+            const categoryImage = imageKey && row[imageKey] ? row[imageKey].trim() : "";
 
-                    // Append the specific variant parameters to the wrapper entity
-                    productsMap[id].variants.push({
-                        weight: row.weight ? row.weight.trim() : "",
-                        price: row.price ? Number(row.price) : 0
-                    });
-                });
+            if (!nestedCategoriesMap[categoryName]) {
+                nestedCategoriesMap[categoryName] = {
+                    category_name: categoryName,
+                    category_image: categoryImage !== "" ? categoryImage : "https://dummyimage.com/400x400/f5f5f5/000&text=No+Image",
+                    subcategories: {}
+                };
+            }
+        });
 
-                // Send clean JSON array payload directly back to your frontend framework
-                res.json({
-                    categories: Array.from(categories),
-                    products: Object.values(productsMap)
-                });
+        // Pass 2: Map products
+        rawProducts.forEach((row, index) => {
+            // Flexible lookup to bypass case-sensitivity issues
+            const idKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'id');
+            const nameKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'product_name');
+            const catKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'category');
+            const subCatKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'sub_category');
+
+            if (!idKey || !nameKey || !row[idKey] || !row[nameKey]) {
+                return; // Guard against blank product rows
+            }
+
+            const id = row[idKey].trim();
+            const productName = row[nameKey].trim();
+            const categoryName = catKey && row[catKey] ? row[catKey].trim() : "Uncategorized";
+            const subCategoryName = subCatKey && row[subCatKey] ? row[subCatKey].trim() : "General";
+
+            if (!nestedCategoriesMap[categoryName]) {
+                nestedCategoriesMap[categoryName] = {
+                    category_name: categoryName,
+                    category_image: "https://dummyimage.com/400x400/f5f5f5/000&text=No+Image",
+                    subcategories: {}
+                };
+            }
+
+            if (!nestedCategoriesMap[categoryName].subcategories[subCategoryName]) {
+                nestedCategoriesMap[categoryName].subcategories[subCategoryName] = [];
+            }
+
+            let existingProduct = nestedCategoriesMap[categoryName].subcategories[subCategoryName].find(p => p.id === id);
+
+            if (!existingProduct) {
+                const imgKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'image');
+                const apmcKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'apmc');
+                const gstKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'gst');
+
+                existingProduct = {
+                    id: id,
+                    name: productName,
+                    image_url: imgKey && row[imgKey] ? row[imgKey].trim() : 'https://dummyimage.com/550x700/f5f5f5/000',
+                    apmc: apmcKey && row[apmcKey] ? row[apmcKey].trim() : "0",
+                    gst: gstKey && row[gstKey] ? row[gstKey].trim() : "0",
+                    variants: []
+                };
+                nestedCategoriesMap[categoryName].subcategories[subCategoryName].push(existingProduct);
+            }
+
+            const weightKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'weight');
+            const priceKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'price');
+            const origPriceKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'original_price');
+
+            existingProduct.variants.push({
+                weight: weightKey && row[weightKey] ? row[weightKey].trim() : "",
+                price: priceKey && row[priceKey] ? Number(row[priceKey]) : 0,
+                original_price: origPriceKey && row[origPriceKey] ? Number(row[origPriceKey]) : null
             });
+        });
+
+        console.log("Successfully built map keys:", Object.keys(nestedCategoriesMap));
+
+        return res.status(200).json({
+            success: true,
+            data: nestedCategoriesMap
+        });
+
     } catch (error) {
         console.error("Sync failure error details:", error.message);
-        res.status(500).json({ error: "Failed to sync inventory with Google Sheets live cloud endpoint." });
+        return res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Start the server directly from this active file process instance
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
     console.log(`Server is running successfully on port ${PORT}`);

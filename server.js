@@ -15,6 +15,7 @@ const allowOrigins = [
     'http://localhost:5173',
     'http://localhost:5000',
     'https://dryfruitmandifrontend.vercel.app',
+    'https://www.dryfruitsmandi.com',
 ];
 
 app.use(cors({

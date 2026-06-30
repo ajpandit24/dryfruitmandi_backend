@@ -11,18 +11,19 @@ exports.createOrder = async (req, res) => {
         const items = orderData.items.map((item) => {
             const quantity = Number(item.quantity ?? 0);
             const price = Number(item.variant?.price ?? 0);
+            const priceWithGST = price + (price * (parseFloat(item.gst ?? "0") / 100)) + (price * (parseFloat(item.apmc ?? "0") / 100));
             return {
                 ...item,
                 variant: item.variant ?? {},
                 quantity,
-                itemSubtotal: price * quantity,
+                itemSubtotal: priceWithGST * quantity,
             };
         });
 
         const subtotal = items.reduce((total, item) => total + item.itemSubtotal, 0);
         const gstTotal = Math.round(subtotal * 0.18 * 100) / 100;
         const apmcTotal = 0;
-        const grandTotal = subtotal + gstTotal + apmcTotal;
+        const grandTotal = subtotal;
 
         const invoicePayload = {
             invoiceId: `INV-${Date.now()}`,

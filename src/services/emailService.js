@@ -22,7 +22,8 @@ exports.sendOrderEmail = async (invoicePayload) => {
     let tableRowsHtml = '';
     items.forEach((item, index) => {
         const itemPrice = Number(item.variant?.price ?? 0);
-        const itemSubtotal = Number(item.itemSubtotal ?? itemPrice * Number(item.quantity ?? 0));
+        const itemPriceWithGST = itemPrice + (itemPrice * (parseFloat(item.gst || "0") / 100)) + (itemPrice * (parseFloat(item.apmc || "0") / 100));
+        const itemSubtotal = Number(item.itemSubtotal ?? itemPriceWithGST * Number(item.quantity ?? 0)); // with gst and apmc included in itemSubtotal
 
         tableRowsHtml += `
             <tr style="border-bottom: 1px solid #edf2f7;">
@@ -32,7 +33,7 @@ exports.sendOrderEmail = async (invoicePayload) => {
                     <div style="font-size: 11px; color: #718096; margin-top: 2px;">Weight: ${item.variant?.weight || 'N/A'}</div>
                 </td>
                 <td style="padding: 10px; font-size: 13px; color: #2d3748; text-align: center;">${item.quantity ?? 0}</td>
-                <td style="padding: 10px; font-size: 13px; color: #2d3748; text-align: right;">₹${itemPrice.toFixed(2)}</td>
+                <td style="padding: 10px; font-size: 13px; color: #2d3748; text-align: right;">₹${itemPriceWithGST.toFixed(2)}</td>
                 <td style="padding: 10px; font-size: 13px; color: #1a202c; text-align: right; font-weight: 600;">₹${itemSubtotal.toFixed(2)}</td>
             </tr>
         `;
@@ -113,20 +114,20 @@ exports.sendOrderEmail = async (invoicePayload) => {
                 </td>
                 <td style="width: 50%; vertical-align: top;">
                     <table style="width: 100%; font-size: 13px; color: #4a5568; line-height: 1.7;">
-                        <tr>
+                        <tr style="display: none;">
                             <td style="text-align: left; padding: 3px 0;">Subtotal Total:</td>
                             <td style="text-align: right; padding: 3px 0; font-weight: 600; color: #2d3748;">₹${financials.subtotal.toFixed(2)}</td>
                         </tr>
-                        <tr>
+                        <tr style="display: none;">
                             <td style="text-align: left; padding: 3px 0;">CGST + SGST:</td>
                             <td style="text-align: right; padding: 3px 0; color: #e53e3e;">+ ₹${financials.gstTotal.toFixed(2)}</td>
                         </tr>
-                        <tr>
+                        <tr style="display: none;">
                             <td style="text-align: left; padding: 3px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">APMC Market Cess Fee:</td>
                             <td style="text-align: right; padding: 3px 0; color: #e53e3e; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">+ ₹${financials.apmcTotal.toFixed(2)}</td>
                         </tr>
                         <tr style="font-size: 16px; color: #1a202c; font-weight: bold;">
-                            <td style="text-align: left; padding-top: 8px;">Grand Total Due:</td>
+                            <td style="text-align: left; padding-top: 8px;">Grand Total:</td>
                             <td style="text-align: right; padding-top: 8px; color: #059669; font-size: 18px;">₹${financials.grandTotal.toFixed(2)}</td>
                         </tr>
                     </table>

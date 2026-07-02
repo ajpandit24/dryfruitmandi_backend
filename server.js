@@ -68,7 +68,7 @@ app.get('/api/categories', async (req, res) => {
 
             const categoryName = row[catKey].trim();
             const subCategoryName = subCatKey && row[subCatKey] ? row[subCatKey].trim() : "";
-            const imageSource = imageKey && row[imageKey] ? row[imageKey].trim() : "https://dummyimage.com/400x400/f5f5f5/000&text=No+Image";
+            const imageSource = imageKey && row[imageKey] ? row[imageKey].trim() : "https://dummyimage.com/400x400/f5f5f5/000&text=Ananya+Enterprises";
 
             if (!categoriesMap[categoryName]) {
                 categoriesMap[categoryName] = {
@@ -129,7 +129,7 @@ app.get('/api/products', async (req, res) => {
             if (!nestedCategoriesMap[categoryName]) {
                 nestedCategoriesMap[categoryName] = {
                     category_name: categoryName,
-                    category_image: categoryImage !== "" ? categoryImage : "https://dummyimage.com/400x400/f5f5f5/000&text=No+Image",
+                    category_image: categoryImage !== "" ? categoryImage : "https://dummyimage.com/400x400/f5f5f5/000&text=Ananya+Enterprises",
                     subcategories: {} // This holds parsed flat arrays inside products endpoint processing tree
                 };
             }
@@ -153,7 +153,7 @@ app.get('/api/products', async (req, res) => {
             if (!nestedCategoriesMap[categoryName]) {
                 nestedCategoriesMap[categoryName] = {
                     category_name: categoryName,
-                    category_image: "https://dummyimage.com/400x400/f5f5f5/000&text=No+Image",
+                    category_image: "https://dummyimage.com/400x400/f5f5f5/000&text=Ananya+Enterprises",
                     subcategories: {}
                 };
             }

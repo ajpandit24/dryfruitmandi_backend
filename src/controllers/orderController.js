@@ -8,22 +8,38 @@ exports.createOrder = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid order data." });
         }
 
+        // Compute per-item APMC and GST using rates provided on each item.
+        // For each item: apmcAmount = subtotal * (apmc%/100)
+        // then gstAmount = (subtotal + apmcAmount) * (gst%/100)
         const items = orderData.items.map((item) => {
             const quantity = Number(item.quantity ?? 0);
             const price = Number(item.variant?.price ?? 0);
-            const priceWithGST = price + (price * (parseFloat(item.gst ?? "0") / 100)) + (price * (parseFloat(item.apmc ?? "0") / 100));
+            const baseSubtotal = price * quantity;
+
+            const apmcRate = parseFloat(item.apmc ?? item.apmc === 0 ? item.apmc : 0) || 0;
+            const gstRate = parseFloat(item.gst ?? item.gst === 0 ? item.gst : 0) || 0;
+
+            const apmcAmount = Math.round(baseSubtotal * (apmcRate / 100) * 100) / 100;
+            const gstAmount = Math.round((baseSubtotal + apmcAmount) * (gstRate / 100) * 100) / 100;
+
+            const itemTotal = Math.round((baseSubtotal + apmcAmount + gstAmount) * 100) / 100;
+
             return {
                 ...item,
                 variant: item.variant ?? {},
                 quantity,
-                itemSubtotal: priceWithGST * quantity,
+                itemSubtotal: baseSubtotal,
+                apmcAmount,
+                gstAmount,
+                itemTotal,
+                appliedRates: { apmcRate, gstRate }
             };
         });
 
-        const subtotal = items.reduce((total, item) => total + item.itemSubtotal, 0);
-        const gstTotal = Math.round(subtotal * 0.18 * 100) / 100;
-        const apmcTotal = 0;
-        const grandTotal = subtotal;
+        const subtotal = Math.round(items.reduce((total, item) => total + (item.itemSubtotal || 0), 0) * 100) / 100;
+        const apmcTotal = Math.round(items.reduce((total, item) => total + (item.apmcAmount || 0), 0) * 100) / 100;
+        const gstTotal = Math.round(items.reduce((total, item) => total + (item.gstAmount || 0), 0) * 100) / 100;
+        const grandTotal = Math.round((subtotal + apmcTotal + gstTotal) * 100) / 100;
 
         const invoicePayload = {
             invoiceId: `INV-${Date.now()}`,

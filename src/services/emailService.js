@@ -108,21 +108,21 @@ exports.sendOrderEmail = async (invoicePayload) => {
                         <div style="margin: 2px 0;"><strong>IFSC Routing Code:</strong> KKBK0001370</div>
                         <div style="margin: 2px 0;"><strong>Account Type:</strong> Current Account (Vashi Branch)</div>
                         <div style="margin: 6px 0 0 0; padding-top: 4px; border-t: 1px solid #e2e8f0; color: #059669; font-weight: bold;">
-                            GPay / PhonePe No: 7710945676 (Hiralal Gupta)
+                            GPay / PhonePe No: 720860 7196 (Hiralal Gupta)
                         </div>
                     </div>
                 </td>
                 <td style="width: 50%; vertical-align: top;">
                     <table style="width: 100%; font-size: 13px; color: #4a5568; line-height: 1.7;">
-                        <tr style="display: none;">
+                        <tr>
                             <td style="text-align: left; padding: 3px 0;">Subtotal Total:</td>
                             <td style="text-align: right; padding: 3px 0; font-weight: 600; color: #2d3748;">₹${financials.subtotal.toFixed(2)}</td>
                         </tr>
-                        <tr style="display: none;">
+                        <tr>
                             <td style="text-align: left; padding: 3px 0;">CGST + SGST:</td>
                             <td style="text-align: right; padding: 3px 0; color: #e53e3e;">+ ₹${financials.gstTotal.toFixed(2)}</td>
                         </tr>
-                        <tr style="display: none;">
+                        <tr>
                             <td style="text-align: left; padding: 3px 0; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">APMC Market Cess Fee:</td>
                             <td style="text-align: right; padding: 3px 0; color: #e53e3e; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">+ ₹${financials.apmcTotal.toFixed(2)}</td>
                         </tr>

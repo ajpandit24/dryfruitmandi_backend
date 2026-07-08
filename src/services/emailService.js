@@ -18,6 +18,7 @@ const transporter = nodemailer.createTransport({
 });
 
 exports.sendOrderEmail = async (invoicePayload) => {
+    console.log("!!! FUNCTION EXECUTED ON LIVE SERVER !!!", JSON.stringify(invoicePayload?.customer));
     const {
         invoiceId = `INV-${Date.now()}`,
         invoiceDate = new Date().toLocaleDateString(),

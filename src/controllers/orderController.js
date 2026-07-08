@@ -59,7 +59,7 @@ exports.createOrder = async (req, res) => {
         // Generate WhatsApp link
         const whatsappLink = whatsappService.generateWhatsAppLink(orderData);
 
-        return res.status(201).json({
+        return res.status(200).json({
             success: true,
             message: "Order initiated successfully. Redirecting to WhatsApp to finalize.",
             whatsappLink: whatsappLink

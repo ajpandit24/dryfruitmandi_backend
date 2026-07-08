@@ -1,3 +1,5 @@
+process.stdout.isTTY = true;
+
 const nodemailer = require('nodemailer');
 
 // Configure your primary mail courier link

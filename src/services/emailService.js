@@ -117,7 +117,7 @@ exports.sendOrderEmail = async (invoicePayload) => {
                         <div style="margin: 2px 0;"><strong>IFSC Routing Code:</strong> KKBK0001370</div>
                         <div style="margin: 2px 0;"><strong>Account Type:</strong> Current Account (Vashi Branch)</div>
                         <div style="margin: 6px 0 0 0; padding-top: 4px; border-top: 1px solid #e2e8f0; color: #059669; font-weight: bold;">
-                            GPay / PhonePe No: 720860 7196 (Hiralal Gupta)
+                            GPay / PhonePe No: 77109 45676 (Hiralal Gupta)
                         </div>
                     </div>
                 </td>

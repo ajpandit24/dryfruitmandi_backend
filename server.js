@@ -1,4 +1,4 @@
-process.stdout.isTTY = true;
+process.stdout.isTTY = true; // Forces Render to flush logs instantly
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -11,6 +11,13 @@ const orderRouter = require('./src/routes/orderRoutes');
 const app = express();
 
 app.use(helmet());
+
+// --- ADDED MIDDLEWARE: Live Request Logger ---
+// This guarantees you see exactly what endpoints your frontend hits in the Render console
+app.use((req, res, next) => {
+    console.log(`[LIVE INCOMING]: ${req.method} ${req.originalUrl} from ${req.headers.origin || 'Unknown'}`);
+    next();
+});
 
 const allowOrigins = [
     'http://localhost:5173',
@@ -32,9 +39,13 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use('/api/orders', orderRouter);
 
-// --- GOOGLE SHEETS LIVE PUBLISHED CSV LINKS ---
+// Main Orders Routing Line (All /api/orders/* requests stream safely down this lane)
+app.use('/api/orders', orderRouter); 
+
+// ==========================================
+// GOOGLE SHEETS LIVE PUBLISHED CSV LINKS
+// ==========================================
 const PRODUCTS_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTJV34w0sNNlTN9Rf-UMPGMpF4LAQi0UiGu_3SLP6rUux_KbQ4mzyzoLX2yZ2fjZkxdhekA0giuCCet/pub?gid=0&single=true&output=csv';
 const CATEGORIES_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTJV34w0sNNlTN9Rf-UMPGMpF4LAQi0UiGu_3SLP6rUux_KbQ4mzyzoLX2yZ2fjZkxdhekA0giuCCet/pub?gid=577856047&single=true&output=csv';
 
@@ -117,7 +128,6 @@ app.get('/api/products', async (req, res) => {
 
         const nestedCategoriesMap = {};
 
-        // Pass 1: Build base categories from dedicated sheet
         rawCategories.forEach((row) => {
             const categoryKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'category');
             const imageKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'category_image');
@@ -131,12 +141,11 @@ app.get('/api/products', async (req, res) => {
                 nestedCategoriesMap[categoryName] = {
                     category_name: categoryName,
                     category_image: categoryImage !== "" ? categoryImage : "https://dummyimage.com/400x400/f5f5f5/000&text=Ananya+Enterprises",
-                    subcategories: {} // This holds parsed flat arrays inside products endpoint processing tree
+                    subcategories: {}
                 };
             }
         });
 
-        // Pass 2: Map products into structure safely
         rawProducts.forEach((row) => {
             const idKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'id');
             const nameKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'product_name');
@@ -150,7 +159,6 @@ app.get('/api/products', async (req, res) => {
             const categoryName = catKey && row[catKey] ? row[catKey].trim() : "Uncategorized";
             const subCategoryName = subCatKey && row[subCatKey] ? row[subCatKey].trim() : "General";
 
-            // SAFE FIX: If category doesn't exist, instantiate it, but DO NOT overwrite if it already exists!
             if (!nestedCategoriesMap[categoryName]) {
                 nestedCategoriesMap[categoryName] = {
                     category_name: categoryName,
@@ -159,7 +167,6 @@ app.get('/api/products', async (req, res) => {
                 };
             }
 
-            // Ensure the subcategory container is a flat array for product accumulation
             if (!nestedCategoriesMap[categoryName].subcategories[subCategoryName] || !Array.isArray(nestedCategoriesMap[categoryName].subcategories[subCategoryName])) {
                 nestedCategoriesMap[categoryName].subcategories[subCategoryName] = [];
             }
@@ -193,12 +200,11 @@ app.get('/api/products', async (req, res) => {
             });
         });
 
-        // 3. Flatten out the tree into a simple list for processing slices
         let finalProductList = [];
         Object.keys(nestedCategoriesMap).forEach(catName => {
             const subcats = nestedCategoriesMap[catName].subcategories;
             Object.keys(subcats).forEach(subcatName => {
-                if (Array.isArray(subcats[subcatName])) { // Verify it's a product group container
+                if (Array.isArray(subcats[subcatName])) {
                     subcats[subcatName].forEach(product => {
                         finalProductList.push({
                             ...product,
@@ -210,7 +216,6 @@ app.get('/api/products', async (req, res) => {
             });
         });
 
-        // 4. Filter directly on the flat data stream
         if (categoryFilter && categoryFilter !== 'All') {
             finalProductList = finalProductList.filter(p => p.category === categoryFilter);
         }
@@ -218,7 +223,6 @@ app.get('/api/products', async (req, res) => {
             finalProductList = finalProductList.filter(p => p.sub_category === subcategoryFilter);
         }
 
-        // 5. Slice limits for pagination chunks
         const totalItems = finalProductList.length;
         const totalPages = Math.ceil(totalItems / limit);
         const startIndex = (page - 1) * limit;
@@ -251,11 +255,9 @@ app.get('/api/products/:id', async (req, res) => {
         const targetId = req.params.id.trim();
         console.log(`--- Fetching details for Product ID: ${targetId} ---`);
 
-        // Pull fresh product sheets data
         const productsResponse = await axios.get(PRODUCTS_CSV_URL);
         const rawProducts = await parseCsvString(productsResponse.data);
 
-        // Filter out rows matching our target ID
         const matchingRows = rawProducts.filter(row => {
             const idKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'id');
             return idKey && row[idKey].trim() === targetId;
@@ -265,7 +267,6 @@ app.get('/api/products/:id', async (req, res) => {
             return res.status(404).json({ success: false, message: "Product not found inside inventory matrix." });
         }
 
-        // Construct the single consolidated item object with its variants
         const firstRow = matchingRows[0];
         const nameKey = Object.keys(firstRow).find(k => k.trim().toLowerCase() === 'product_name');
         const imgKey = Object.keys(firstRow).find(k => k.trim().toLowerCase() === 'image');
@@ -285,7 +286,6 @@ app.get('/api/products/:id', async (req, res) => {
             variants: []
         };
 
-        // Populate variants from all matching rows
         matchingRows.forEach(row => {
             const weightKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'weight');
             const priceKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'price');
@@ -294,7 +294,7 @@ app.get('/api/products/:id', async (req, res) => {
             productDetail.variants.push({
                 weight: weightKey && row[weightKey] ? row[weightKey].trim() : "",
                 price: priceKey && row[priceKey] ? Number(row[priceKey]) : 0,
-                originalPrice: origPriceKey && row[origPriceKey] ? Number(row[origPriceKey]) : null // camelCase to match your frontend code!
+                originalPrice: origPriceKey && row[origPriceKey] ? Number(row[origPriceKey]) : null
             });
         });
 
@@ -309,13 +309,11 @@ app.get('/api/products/:id', async (req, res) => {
     }
 });
 
-app.post('/api/orders/submit', async (req, res) => {
-    const orderData = req.body; 
-    res.status(200).json({ success: true, message: "Order processed successfully!" });
-});
+// ❌ REMOVED: app.post('/api/orders/submit') has been deleted here!
+// Your submit handling belongs fully inside your src/routes/orderRoutes.js file.
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000; // Updated to Render's default binding port
 app.listen(PORT, () => {
-    console.log(`Server is running successfully on port ${process.env.EMAIL_FROM || 5000}`);
-
+    // --- FIXED: Changed error log placeholder variable back to PORT ---
+    console.log(`Server is running successfully on port ${PORT}`);
 });

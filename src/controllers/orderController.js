@@ -54,8 +54,11 @@ exports.createOrder = async (req, res) => {
             },
         };
 
+        console.log("Live Step 1: Initiating email call...");
+
         await emailService.sendOrderEmail(invoicePayload);
 
+        console.log("Live Step 2: Email service results:", emailResult);
         // Generate WhatsApp link
         const whatsappLink = whatsappService.generateWhatsAppLink(orderData);
 

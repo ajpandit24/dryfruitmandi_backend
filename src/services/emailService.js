@@ -2,18 +2,10 @@ const nodemailer = require('nodemailer');
 
 // Configure your primary mail courier link
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
-    port: parseInt(process.env.EMAIL_PORT || '587', 10),
-    secure: false, // true for port 465, false for port 587
+    service: 'gmail',
     auth: {
-        // Your Brevo login (usually your registered account email)
-        user: process.env.EMAIL_USER || 'your-brevo-login-email@example.com',
-        // Your master SMTP Key generated from the Brevo SMTP & API tab
-        pass: process.env.EMAIL_PASS || 'xsmtpsib-xxxxxxxxxxxxxxxxxxxxxxxx'
-    },
-    // Optional: Force TLS connection routing safety
-    tls: {
-        rejectUnauthorized: true
+        user: process.env.EMAIL_USER || 'YOUR_SYSTEM_EMAIL@gmail.com',
+        pass: process.env.EMAIL_PASS || 'YOUR_GMAIL_APP_PASSWORD' // Your 16-character Google app security passphrase
     }
 });
 
@@ -31,7 +23,7 @@ exports.sendOrderEmail = async (invoicePayload) => {
     items.forEach((item, index) => {
         const itemPrice = Number(item.variant?.price ?? 0);
         const itemPriceWithGST = itemPrice + (itemPrice * (parseFloat(item.gst || "0") / 100)) + (itemPrice * (parseFloat(item.apmc || "0") / 100));
-        const itemSubtotal = Number(item.itemSubtotal ?? itemPriceWithGST * Number(item.quantity ?? 0)); 
+        const itemSubtotal = Number(item.itemSubtotal ?? itemPriceWithGST * Number(item.quantity ?? 0)); // with gst and apmc included in itemSubtotal
 
         tableRowsHtml += `
             <tr style="border-bottom: 1px solid #edf2f7;">
@@ -115,7 +107,7 @@ exports.sendOrderEmail = async (invoicePayload) => {
                         <div style="margin: 2px 0;"><strong>Account Number:</strong> 0246207621</div>
                         <div style="margin: 2px 0;"><strong>IFSC Routing Code:</strong> KKBK0001370</div>
                         <div style="margin: 2px 0;"><strong>Account Type:</strong> Current Account (Vashi Branch)</div>
-                        <div style="margin: 6px 0 0 0; padding-top: 4px; border-top: 1px solid #e2e8f0; color: #059669; font-weight: bold;">
+                        <div style="margin: 6px 0 0 0; padding-top: 4px; border-t: 1px solid #e2e8f0; color: #059669; font-weight: bold;">
                             GPay / PhonePe No: 720860 7196 (Hiralal Gupta)
                         </div>
                     </div>
@@ -158,24 +150,13 @@ exports.sendOrderEmail = async (invoicePayload) => {
     </div>
     `;
 
-    try {
-        const mailOptions = {
-            from: `"DryFruits Mandi" <${process.env.EMAIL_FROM || 'your-verified-domain@example.com'}>`,
-            // Deliveries to customer and yourself simultaneously
-            to: [customer.email, process.env.EMAIL_USER || 'your-brevo-login-email@example.com'], 
-            subject: `Tax Invoice Confirmation Request ${invoiceId} - ${customer.name}`,
-            html: emailTemplateHtml
-        };
+    // Fire out the messages to both paths concurrently
+    const mailOptions = {
+        from: '"Dry Fruits Mandi Automated Systems" <YOUR_SYSTEM_EMAIL@gmail.com>',
+        to: [customer.email, process.env.EMAIL_USER], // Deliveries to customer and yourself simultaneously
+        subject: `Tax Invoice Confirmation Request ${invoiceId} - ${customer.name}`,
+        html: emailTemplateHtml
+    };
 
-        // --- FIXED: Added await here so the promise resolves before returning ---
-        const info = await transporter.sendMail(mailOptions);
-        
-        console.log('Email sent successfully via Brevo Relay ID:', info.messageId);
-        return { success: true, messageId: info.messageId };
-        
-    } catch (err) {
-        // --- FIXED: Changed error.message to err.message to avoid ReferenceError ---
-        console.error('Nodemailer relay error:', err.message);
-        return { success: false, error: err.message };
-    }
+    return transporter.sendMail(mailOptions);
 };

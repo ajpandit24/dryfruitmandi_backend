@@ -2,6 +2,10 @@ process.stdout.isTTY = true;
 
 const nodemailer = require('nodemailer');
 
+console.log("--- INITIALIZING TRANS-PORT DEPLOYMENT PARAMS ---");
+console.log("Brevo Host Agent:", process.env.EMAIL_HOST || 'smtp-relay.brevo.com');
+console.log("Brevo User Account:", process.env.EMAIL_USER);
+
 // Configure your primary mail courier link
 const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
@@ -13,9 +17,14 @@ const transporter = nodemailer.createTransport({
         // Your master SMTP Key generated from the Brevo SMTP & API tab
         pass: process.env.EMAIL_PASS || 'xsmtpsib-xxxxxxxxxxxxxxxxxxxxxxxx'
     },
+
+    connectionTimeout: 10000, // 10 seconds max wait time to connect
+    greetingTimeout: 10000,   // 10 seconds max wait for SMTP greeting
+    socketTimeout: 15000,
     // Optional: Force TLS connection routing safety
     tls: {
-        rejectUnauthorized: true
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
     }
 });
 

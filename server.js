@@ -317,3 +317,10 @@ app.listen(PORT, () => {
     // --- FIXED: Changed error log placeholder variable back to PORT ---
     console.log(`Server is running successfully on port ${PORT}`);
 });
+
+app.get('/', (req, res) => {
+    res.status(200).json({ 
+        success: true, 
+        message: "Dry Fruits Mandi API Gateway is fully operational!" 
+    });
+});

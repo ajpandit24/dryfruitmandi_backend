@@ -54,12 +54,12 @@ exports.createOrder = async (req, res) => {
             },
         };
 
-        console.log("Live Step 1: Initiating email call...");
+        console.log("Live Step 1: Initiating email process in background...");
+        emailService.sendOrderEmail(invoicePayload)
+            .then((result) => console.log("Live Step 2: Background Email Success:", result))
+            .catch((err) => console.error("Live Step 2 Error: Background Email Failed:", err.message));
 
-       const emailResult = await emailService.sendOrderEmail(invoicePayload);
-
-        console.log("Live Step 2: Email service results:", emailResult);
-        // Generate WhatsApp link
+        // Generate WhatsApp link instantly without waiting
         const whatsappLink = whatsappService.generateWhatsAppLink(orderData);
 
         return res.status(200).json({

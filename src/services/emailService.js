@@ -30,7 +30,7 @@ exports.sendOrderEmail = async (invoicePayload) => {
     
 console.log("--- INITIALIZING TRANS-PORT DEPLOYMENT PARAMS ---");
 console.log("Brevo Host Agent:", process.env.EMAIL_HOST || 'smtp-relay.brevo.com');
-console.log("Brevo User Account:", process.env.EMAIL_PORT);
+console.log("Brevo User Account:", process.env.EMAIL_USER);
     const {
         invoiceId = `INV-${Date.now()}`,
         invoiceDate = new Date().toLocaleDateString(),

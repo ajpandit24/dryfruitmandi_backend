@@ -2,9 +2,6 @@ process.stdout.isTTY = true;
 
 const nodemailer = require('nodemailer');
 
-console.log("--- INITIALIZING TRANS-PORT DEPLOYMENT PARAMS ---");
-console.log("Brevo Host Agent:", process.env.EMAIL_HOST || 'smtp-relay.brevo.com');
-console.log("Brevo User Account:", process.env.EMAIL_USER);
 
 // Configure your primary mail courier link
 const transporter = nodemailer.createTransport({
@@ -29,7 +26,11 @@ const transporter = nodemailer.createTransport({
 });
 
 exports.sendOrderEmail = async (invoicePayload) => {
-    console.log("!!! FUNCTION EXECUTED ON LIVE SERVER !!!", JSON.stringify(invoicePayload?.customer));
+    // console.log("!!! FUNCTION EXECUTED ON LIVE SERVER !!!", JSON.stringify(invoicePayload?.customer));
+    
+console.log("--- INITIALIZING TRANS-PORT DEPLOYMENT PARAMS ---");
+console.log("Brevo Host Agent:", process.env.EMAIL_HOST || 'smtp-relay.brevo.com');
+console.log("Brevo User Account:", process.env.EMAIL_USER);
     const {
         invoiceId = `INV-${Date.now()}`,
         invoiceDate = new Date().toLocaleDateString(),

@@ -7,7 +7,7 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
     host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
     port: parseInt(process.env.EMAIL_PORT || '465', 10),
-    secure: true, // true for port 465, false for port 587
+    secure: false, // true for port 465, false for port 587
     auth: {
         // Your Brevo login (usually your registered account email)
         user: process.env.EMAIL_USER || 'your-brevo-login-email@example.com',
@@ -30,7 +30,7 @@ exports.sendOrderEmail = async (invoicePayload) => {
     
 console.log("--- INITIALIZING TRANS-PORT DEPLOYMENT PARAMS ---");
 console.log("Brevo Host Agent:", process.env.EMAIL_HOST || 'smtp-relay.brevo.com');
-console.log("Brevo User Account:", process.env.EMAIL_USER);
+console.log("Brevo User Account:", process.env.EMAIL_USER, process.env.EMAIL_PORT);
     const {
         invoiceId = `INV-${Date.now()}`,
         invoiceDate = new Date().toLocaleDateString(),

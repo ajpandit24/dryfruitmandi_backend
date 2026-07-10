@@ -19,6 +19,8 @@ async function sendOrderToSheets(orderData) {
             phone: orderData.phone,
             email: orderData.email,
             address: orderData.address,
+            fssai: orderData.fssai,
+            gst: orderData.gst,
             details: itemDetailsString,
             total: `₹${orderData.totalAmount}`
         };

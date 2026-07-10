@@ -95,6 +95,8 @@ console.log("Brevo User Account:", process.env.EMAIL_USER, process.env.EMAIL_POR
                     <div style="font-weight: 700; color: #2d3748; margin-bottom: 2px;">${customer.name}</div>
                     <div><strong>WhatsApp:</strong> +${customer.phone}</div>
                     <div><strong>Email:</strong> ${customer.email}</div>
+                    <div><strong>GSTIN:</strong> ${customer.gst}</div>
+                    <div><strong>FSSAI:</strong> ${customer.fssai}</div>
                     <div style="margin-top: 4px;"><strong>Delivery Address:</strong></div>
                     <div style="margin-top: 2px; padding: 8px; background-color: #edf2f7; border-radius: 4px; border: 1px solid #e2e8f0; color: #2d3748;">
                         ${customer.address}

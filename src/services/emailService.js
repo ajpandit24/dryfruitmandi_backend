@@ -177,7 +177,7 @@ console.log("Brevo User Account:", process.env.EMAIL_USER, process.env.EMAIL_POR
         const mailOptions = {
             from: `"DryFruits Mandi" <${process.env.EMAIL_FROM || 'your-verified-domain@example.com'}>`,
             // Deliveries to customer and yourself simultaneously
-            to: [customer.email, process.env.EMAIL_USER || 'your-brevo-login-email@example.com'], 
+            to: [customer.email, process.env.EMAIL_ADMIN || 'your-brevo-login-email@example.com'], 
             subject: `Tax Invoice Confirmation Request ${invoiceId} - ${customer.name}`,
             html: emailTemplateHtml
         };

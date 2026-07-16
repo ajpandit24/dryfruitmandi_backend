@@ -207,9 +207,9 @@ app.get('/api/products', async (req, res) => {
             const rawPrice = priceKey && row[priceKey] ? Number(row[priceKey]) : 0;
 
             // 🛑 AVOID 0 PRICES: Skip pushing this variant if the price is missing or zero
-            if (rawPrice <= 0) {
-                return; // skips this row's variant profile
-            }
+            // if (rawPrice <= 0) {
+            //     return; // skips this row's variant profile
+            // }
 
             existingProduct.variants.push({
                 weight: weightKey && row[weightKey] ? row[weightKey].trim() : "",

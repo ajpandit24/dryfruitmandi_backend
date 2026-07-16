@@ -7,6 +7,7 @@ const { Readable } = require('stream');
 const csv = require('csv-parser');
 const axios = require('axios');
 const orderRouter = require('./src/routes/orderRoutes');
+const NodeCache = require("node-cache");
 
 const app = express();
 
@@ -41,7 +42,7 @@ app.use(cors({
 app.use(express.json());
 
 // Main Orders Routing Line (All /api/orders/* requests stream safely down this lane)
-app.use('/api/orders', orderRouter); 
+app.use('/api/orders', orderRouter);
 
 // ==========================================
 // GOOGLE SHEETS LIVE PUBLISHED CSV LINKS
@@ -110,18 +111,25 @@ app.get('/api/categories', async (req, res) => {
 // ==========================================
 // OPTIMIZED PAGINATED PRODUCTS ENDPOINT
 // ==========================================
+
+const productCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
 app.get('/api/products', async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 12;
         const categoryFilter = req.query.category;
         const subcategoryFilter = req.query.subcategory;
+        const shopByFilter = req.query.shop_by; // 1. Extracted from query
+
+        let finalProductList = productCache.get("all_processed_products");
 
         console.log("--- Fetching data from Google Sheets ---");
-        const [productsResponse, categoriesResponse] = await Promise.all([
-            axios.get(PRODUCTS_CSV_URL),
-            axios.get(CATEGORIES_CSV_URL)
-        ]);
+        if (!finalProductList) {
+            console.log("--- Cache Miss: Fetching fresh data from Google Sheets ---");
+            const [productsResponse, categoriesResponse] = await Promise.all([
+                axios.get(PRODUCTS_CSV_URL),
+                axios.get(CATEGORIES_CSV_URL)
+            ]);
 
         const rawProducts = await parseCsvString(productsResponse.data);
         const rawCategories = await parseCsvString(categoriesResponse.data);
@@ -151,13 +159,15 @@ app.get('/api/products', async (req, res) => {
             const nameKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'product_name');
             const catKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'category');
             const subCatKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'sub_category');
+            const shopByKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'shop_by'); // Match column dynamically
 
             if (!idKey || !nameKey || !row[idKey] || !row[nameKey]) return;
 
             const id = row[idKey].trim();
-            const productName = row[nameKey].trim();
+            const productName = nameKey && row[nameKey] ? row[nameKey].trim() : "";
             const categoryName = catKey && row[catKey] ? row[catKey].trim() : "Uncategorized";
             const subCategoryName = subCatKey && row[subCatKey] ? row[subCatKey].trim() : "General";
+            const shopByValue = shopByKey && row[shopByKey] ? row[shopByKey].trim() : ""; // Normalize sheet value
 
             if (!nestedCategoriesMap[categoryName]) {
                 nestedCategoriesMap[categoryName] = {
@@ -181,6 +191,7 @@ app.get('/api/products', async (req, res) => {
                 existingProduct = {
                     id: id,
                     name: productName,
+                    shop_by: shopByValue, // 2. Store field value directly inside the dynamic object structure
                     image_url: imgKey && row[imgKey] ? row[imgKey].trim() : 'https://dummyimage.com/550x700/f5f5f5/000',
                     apmc: apmcKey && row[apmcKey] ? row[apmcKey].trim() : "0",
                     gst: gstKey && row[gstKey] ? row[gstKey].trim() : "0",
@@ -193,51 +204,62 @@ app.get('/api/products', async (req, res) => {
             const priceKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'price');
             const origPriceKey = Object.keys(row).find(k => k.trim().toLowerCase() === 'original_price');
 
+            const rawPrice = priceKey && row[priceKey] ? Number(row[priceKey]) : 0;
+
+            // 🛑 AVOID 0 PRICES: Skip pushing this variant if the price is missing or zero
+            if (rawPrice <= 0) {
+                return; // skips this row's variant profile
+            }
+
             existingProduct.variants.push({
                 weight: weightKey && row[weightKey] ? row[weightKey].trim() : "",
-                price: priceKey && row[priceKey] ? Number(row[priceKey]) : 0,
+                price: rawPrice,
                 original_price: origPriceKey && row[origPriceKey] ? Number(row[origPriceKey]) : null
             });
         });
 
-        let finalProductList = [];
-        Object.keys(nestedCategoriesMap).forEach(catName => {
-            const subcats = nestedCategoriesMap[catName].subcategories;
-            Object.keys(subcats).forEach(subcatName => {
-                if (Array.isArray(subcats[subcatName])) {
-                    subcats[subcatName].forEach(product => {
-                        finalProductList.push({
-                            ...product,
-                            category: catName,
-                            sub_category: subcatName
+        finalProductList = [];
+            Object.keys(nestedCategoriesMap).forEach(catName => {
+                const subcats = nestedCategoriesMap[catName].subcategories;
+                Object.keys(subcats).forEach(subcatName => {
+                    if (Array.isArray(subcats[subcatName])) {
+                        subcats[subcatName].forEach(product => {
+                            if (product.variants && product.variants.length > 0) { // filter out 0 price variants
+                                finalProductList.push({
+                                    ...product,
+                                    category: catName,
+                                    sub_category: subcatName
+                                });
+                            }
                         });
-                    });
-                }
+                    }
+                });
             });
-        });
 
+            // 2. Save to cache so the next user gets it instantly
+            productCache.set("all_processed_products", finalProductList);
+        } else {
+            console.log("--- Cache Hit: Serving instantly from memory ---");
+        }
+
+        let filteredList = [...finalProductList];
         if (categoryFilter && categoryFilter !== 'All') {
-            finalProductList = finalProductList.filter(p => p.category === categoryFilter);
+            filteredList = filteredList.filter(p => p.category === categoryFilter);
         }
         if (subcategoryFilter && subcategoryFilter !== 'All') {
-            finalProductList = finalProductList.filter(p => p.sub_category === subcategoryFilter);
+            filteredList = filteredList.filter(p => p.sub_category === subcategoryFilter);
+        }
+        if (shopByFilter && shopByFilter !== 'All') {
+            filteredList = filteredList.filter(p => p.shop_by && p.shop_by.trim().toLowerCase() === shopByFilter.trim().toLowerCase());
         }
 
-        const totalItems = finalProductList.length;
+        const totalItems = filteredList.length;
         const totalPages = Math.ceil(totalItems / limit);
-        const startIndex = (page - 1) * limit;
-        const endIndex = page * limit;
-        const paginatedSlice = finalProductList.slice(startIndex, endIndex);
+        const paginatedSlice = filteredList.slice((page - 1) * limit, page * limit);
 
         return res.status(200).json({
             success: true,
-            pagination: {
-                totalItems,
-                totalPages,
-                currentPage: page,
-                limit,
-                hasMore: page < totalPages
-            },
+            pagination: { totalItems, totalPages, currentPage: page, limit, hasMore: page < totalPages },
             data: paginatedSlice
         });
 
@@ -319,8 +341,8 @@ app.listen(PORT, () => {
 });
 
 app.get('/', (req, res) => {
-    res.status(200).json({ 
-        success: true, 
-        message: "Dry Fruits Mandi API Gateway is fully operational!" 
+    res.status(200).json({
+        success: true,
+        message: "Dry Fruits Mandi API Gateway is fully operational!"
     });
 });
